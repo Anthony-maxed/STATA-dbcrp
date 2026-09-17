@@ -1,0 +1,164 @@
+*! version 5.4 dbcrp - Creado por Anthony Facundo Huaynate Onofre
+capture program drop dbcrp
+program define dbcrp
+    version 15
+    syntax anything(name=args) [, Names(string)]
+    
+    local n_words : word count `args'
+    
+    * INTELIGENCIA: Identificar cuántas fechas hay al final
+    local fin_test : word `n_words' of `args'
+    local ini_test : word `= `n_words' - 1 ' of `args'
+    
+    local num_fechas = 0
+    if regexm("`fin_test'", "^[0-9]") {
+        local num_fechas = 1
+        if regexm("`ini_test'", "^[0-9]") {
+            local num_fechas = 2
+        }
+    }
+    
+    * Asignar inicio, fin y cantidad de series según las fechas detectadas
+    if `num_fechas' == 2 {
+        local p_fin = `n_words'
+        local p_ini = `n_words' - 1
+        local p_series = `n_words' - 2
+        local fin : word `p_fin' of `args'
+        local ini : word `p_ini' of `args'
+    }
+    else if `num_fechas' == 1 {
+        local p_ini = `n_words'
+        local p_series = `n_words' - 1
+        local ini : word `p_ini' of `args'
+        local fin "2099" // Asume la actualidad
+    }
+    else {
+        local p_series = `n_words'
+        local ini "1900" // Asume toda la historia
+        local fin "2099"
+    }
+    
+    local listaseries ""
+    forval i = 1/`p_series' {
+        local s : word `i' of `args'
+        local listaseries "`listaseries' `s'"
+    }
+    
+    if "`names'" != "" {
+        local n_names : word count `names'
+        if `n_names' != `p_series' {
+            display as error "Error: Indicaste `p_series' serie(s) pero diste `n_names' nombre(s) en names()."
+            exit 198
+        }
+    }
+    
+    local contador = 1
+    foreach serie in `listaseries' {
+        local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`ini'/`fin'"
+        
+        capture copy "`url'" "temp_raw.txt", replace
+        capture confirm file "temp_raw.txt"
+        if _rc != 0 {
+            display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexión o el código."
+            exit 601
+        }
+        
+        capture erase "temp_clean.csv"
+        filefilter "temp_raw.txt" "temp_clean.csv", from("<br>") to("\n") replace
+        
+        import delimited "temp_clean.csv", clear varnames(nonames)
+        
+        capture confirm variable v2
+        if _rc != 0 {
+            display as error "ERROR: La serie `serie' no existe en el BCRP o está vacía."
+            capture erase "temp_raw.txt"
+            capture erase "temp_clean.csv"
+            exit 111
+        }
+        
+        quietly {
+            local titulo_full = v2[1]
+            
+            if "`names'" != "" {
+                local var_nom : word `contador' of `names'
+            }
+            else {
+                local var_nom "`serie'"
+            }
+            
+            rename v1 periodo
+            rename v2 `var_nom'
+            
+            note `var_nom': Nombre original BCRP: `titulo_full'
+            
+            drop in 1 
+            destring `var_nom', replace force
+            
+            gen str_lower = lower(periodo)
+            gen byte freq = 1 
+            replace freq = 4 if regexm(str_lower, "t[1-4]")
+            replace freq = 12 if regexm(str_lower, "(ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic)")
+            
+            if freq[1] == 1 {
+                gen fecha = real(periodo)
+                format fecha %tg
+            }
+            if freq[1] == 4 {
+                gen trim = real(regexs(1)) if regexm(str_lower, "t([1-4])")
+                gen anio = real(regexs(1)) if regexm(str_lower, "([0-9]+)$")
+                replace anio = anio + 1900 if anio > 50 & anio < 100
+                replace anio = anio + 2000 if anio <= 50
+                gen fecha = yq(anio, trim)
+                format fecha %tq
+                drop trim anio
+            }
+            if freq[1] == 12 {
+                gen mes = .
+                replace mes = 1 if regexm(str_lower, "ene")
+                replace mes = 2 if regexm(str_lower, "feb")
+                replace mes = 3 if regexm(str_lower, "mar")
+                replace mes = 4 if regexm(str_lower, "abr")
+                replace mes = 5 if regexm(str_lower, "may")
+                replace mes = 6 if regexm(str_lower, "jun")
+                replace mes = 7 if regexm(str_lower, "jul")
+                replace mes = 8 if regexm(str_lower, "ago")
+                replace mes = 9 if regexm(str_lower, "sep|set")
+                replace mes = 10 if regexm(str_lower, "oct")
+                replace mes = 11 if regexm(str_lower, "nov")
+                replace mes = 12 if regexm(str_lower, "dic")
+                
+                gen anio = real(regexs(1)) if regexm(str_lower, "([0-9]+)$")
+                replace anio = anio + 1900 if anio > 50 & anio < 100
+                replace anio = anio + 2000 if anio <= 50
+                gen fecha = ym(anio, mes)
+                format fecha %tm
+                drop mes anio
+            }
+            
+            drop str_lower freq periodo
+            
+            if `contador' == 1 {
+                save "base_consolidada.dta", replace
+            }
+            else {
+                save "temp_serie.dta", replace
+                use "base_consolidada.dta", clear
+                merge 1:1 fecha using "temp_serie.dta", nogenerate
+                save "base_consolidada.dta", replace
+            }
+            local contador = `contador' + 1
+        }
+    }
+    
+    quietly {
+        use "base_consolidada.dta", clear
+        tsset fecha
+        order fecha
+        capture erase "temp_raw.txt"
+        capture erase "temp_clean.csv"
+        capture erase "temp_serie.dta"
+        capture erase "base_consolidada.dta"
+    }
+    display as result "Proceso terminado."
+	display as text "Para citar este comando: Huaynate Onofre, A. (2026). dbcrp: Stata module to download BCRP data."
+end
