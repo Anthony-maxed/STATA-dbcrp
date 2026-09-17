@@ -1,4 +1,4 @@
-*! version 5.6 dbcrp - Creado por Anthony Facundo Huaynate Onofre
+*! version 5.7 dbcrp - Creado por Anthony Facundo Huaynate Onofre
 capture program drop dbcrp
 program define dbcrp
     version 15
@@ -60,10 +60,13 @@ program define dbcrp
         }
     }
     
+    * ARCHIVOS FANTASMA: Evitan errores de directorio y permisos
+    tempfile temp_raw temp_clean temp_serie base_consolidada
+    
     local contador = 1
     foreach serie in `listaseries' {
         
-        * INTELIGENCIA DE URL: Autocompletar meses/trimestres si se omitió el formato
+        * INTELIGENCIA DE URL: Autocompletar meses/trimestres
         local url_ini "`ini'"
         local url_fin "`fin'"
         local len = length("`serie'")
@@ -85,23 +88,21 @@ program define dbcrp
         
         local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`url_ini'/`url_fin'"
         
-        capture copy "`url'" "temp_raw.txt", replace
-        capture confirm file "temp_raw.txt"
+        capture copy "`url'" "`temp_raw'", replace
+        capture confirm file "`temp_raw'"
         if _rc != 0 {
             display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexion o el codigo."
             exit 601
         }
         
-        capture erase "temp_clean.csv"
-        filefilter "temp_raw.txt" "temp_clean.csv", from("<br>") to("\n") replace
+        capture erase "`temp_clean'"
+        filefilter "`temp_raw'" "`temp_clean'", from("<br>") to("\n") replace
         
-        import delimited "temp_clean.csv", clear varnames(nonames)
+        import delimited "`temp_clean'", clear varnames(nonames)
         
         capture confirm variable v2
         if _rc != 0 {
             display as error "ERROR: La serie `serie' no existe en el BCRP o esta vacia."
-            capture erase "temp_raw.txt"
-            capture erase "temp_clean.csv"
             exit 111
         }
         
@@ -167,26 +168,22 @@ program define dbcrp
             drop str_lower freq periodo
             
             if `contador' == 1 {
-                save "base_consolidada.dta", replace
+                save "`base_consolidada'", replace
             }
             else {
-                save "temp_serie.dta", replace
-                use "base_consolidada.dta", clear
-                merge 1:1 fecha using "temp_serie.dta", nogenerate
-                save "base_consolidada.dta", replace
+                save "`temp_serie'", replace
+                use "`base_consolidada'", clear
+                merge 1:1 fecha using "`temp_serie'", nogenerate
+                save "`base_consolidada'", replace
             }
             local contador = `contador' + 1
         }
     }
     
     quietly {
-        use "base_consolidada.dta", clear
+        use "`base_consolidada'", clear
         tsset fecha
         order fecha
-        capture erase "temp_raw.txt"
-        capture erase "temp_clean.csv"
-        capture erase "temp_serie.dta"
-        capture erase "base_consolidada.dta"
     }
     display as result "Proceso terminado."
     display as text "Para citar este comando: Huaynate Onofre, A. (2026). dbcrp: Stata module to download BCRP data."
