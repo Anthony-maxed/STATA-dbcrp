@@ -37,7 +37,7 @@ Descarga toda la data disponible desde el origen hasta hoy, alinea los periodos 
 ### 2. Descargar un periodo cerrado con nombres personalizados
 
 ```stata
-dbcrp PN01770AM PN01771AM 2015-1 2024-12, names(inflacion_lima inflacion_nacional)
+dbcrp PN01770AM PN01771AM 2015-1 2024-12, names(PBI sec_prima)
 ```
 
 Descarga datos mensuales desde enero de 2015 hasta diciembre de 2024 y renombra las columnas automáticamente.
