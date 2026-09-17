@@ -1,0 +1,3 @@
+v 5.4
+d Modulos de Stata por Anthony Facundo Huaynate Onofre
+p dbcrp DBCRP - Descargador de series de tiempo del BCRP
