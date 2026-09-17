@@ -9,10 +9,10 @@ El comando maneja automáticamente las etiquetas HTML residuales del servidor gu
 
 ## Instalación
 
-1. Descarga el archivo `dbcrp.ado` de este repositorio.
-2. Cópialo en tu carpeta de comandos personales de Stata. Usualmente la ruta es:
-   * **Windows:** `C:\ado\personal\` o `C:\Users\TuUsuario\ado\plus\`
-   * **Mac:** `~/Library/Application Support/Stata/ado/personal/`
+Puedes instalar el comando directamente ejecutando la siguiente línea en la consola de Stata:
+
+```stata
+net install dbcrp, from("[https://raw.githubusercontent.com/TU_USUARIO/STATA-dbcrp/main/](https://raw.githubusercontent.com/TU_USUARIO/TU_REPOSITORIO/main/)") replace
 
 ## Sintaxis
 
