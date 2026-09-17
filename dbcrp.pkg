@@ -1,0 +1,6 @@
+v 5.4
+d 'DBCRP': Descarga automatizada de series de tiempo del BCRP
+d Modulo de Stata para descargar series macroeconomicas del API del BCRP
+d Autor: Anthony Facundo Huaynate Onofre
+d Distribucion-Fecha: 20260917
+f dbcrp.ado
