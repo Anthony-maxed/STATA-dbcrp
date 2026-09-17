@@ -1,4 +1,4 @@
-*! version 5.5 dbcrp - Creado por Anthony Facundo Huaynate Onofre
+*! version 5.6 dbcrp - Creado por Anthony Facundo Huaynate Onofre
 capture program drop dbcrp
 program define dbcrp
     version 15
@@ -21,7 +21,7 @@ program define dbcrp
         }
     }
     
-    * Asignar inicio, fin y cantidad de series según las fechas detectadas
+    * Asignar inicio, fin y cantidad de series
     if `num_fechas' == 2 {
         local p_fin = `n_words'
         local p_ini = `n_words' - 1
@@ -62,12 +62,33 @@ program define dbcrp
     
     local contador = 1
     foreach serie in `listaseries' {
-        local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`ini'/`fin'"
+        
+        * INTELIGENCIA DE URL: Autocompletar meses/trimestres si se omitió el formato
+        local url_ini "`ini'"
+        local url_fin "`fin'"
+        local len = length("`serie'")
+        local char_freq = upper(substr("`serie'", `len', 1))
+        
+        if regexm("`url_ini'", "^[0-9][0-9][0-9][0-9]$") {
+            if "`char_freq'" == "M" | "`char_freq'" == "Q" {
+                local url_ini "`url_ini'-1"
+            }
+        }
+        if regexm("`url_fin'", "^[0-9][0-9][0-9][0-9]$") {
+            if "`char_freq'" == "M" {
+                local url_fin "`url_fin'-12"
+            }
+            else if "`char_freq'" == "Q" {
+                local url_fin "`url_fin'-4"
+            }
+        }
+        
+        local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`url_ini'/`url_fin'"
         
         capture copy "`url'" "temp_raw.txt", replace
         capture confirm file "temp_raw.txt"
         if _rc != 0 {
-            display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexion o el codigo ingresado."
+            display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexion o el codigo."
             exit 601
         }
         
