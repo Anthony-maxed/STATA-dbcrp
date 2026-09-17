@@ -12,7 +12,7 @@ El comando maneja automáticamente las etiquetas HTML residuales del servidor gu
 Puedes instalar el comando directamente ejecutando la siguiente línea en la consola de Stata:
 
 ```stata
-net install dbcrp, from("[https://raw.githubusercontent.com/TU_USUARIO/STATA-dbcrp/main/](https://raw.githubusercontent.com/TU_USUARIO/TU_REPOSITORIO/main/)") replace
+net install dbcrp, from("https://raw.githubusercontent.com/Anthony-maxed/STATA-dbcrp/main/") replace
 
 ## Sintaxis
 
