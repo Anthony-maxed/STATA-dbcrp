@@ -42,6 +42,8 @@ dbcrp PN01770AM PN01771AM 2015-1 2024-12, names(PBI sec_prima)
 
 Descarga datos mensuales desde enero de 2015 hasta diciembre de 2024 y renombra las columnas automáticamente.
 
+> **Nota sobre el formato de fecha:** el número que va después del guion depende de la frecuencia de la serie: para datos **mensuales** va de **1 a 12** (ej. `2015-1` = enero 2015), y para datos **trimestrales** va de **1 a 4** (ej. `2015-1` = primer trimestre 2015).
+
 ### 3. Descargar desde una fecha específica hasta la actualidad
 
 ```stata
