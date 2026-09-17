@@ -1,4 +1,4 @@
-*! version 5.4 dbcrp - Creado por Anthony Facundo Huaynate Onofre
+*! version 5.5 dbcrp - Creado por Anthony Facundo Huaynate Onofre
 capture program drop dbcrp
 program define dbcrp
     version 15
@@ -6,15 +6,18 @@ program define dbcrp
     
     local n_words : word count `args'
     
-    * INTELIGENCIA: Identificar cuántas fechas hay al final
-    local fin_test : word `n_words' of `args'
-    local ini_test : word `= `n_words' - 1 ' of `args'
-    
+    * INTELIGENCIA: Identificar fechas al final de forma segura
     local num_fechas = 0
-    if regexm("`fin_test'", "^[0-9]") {
-        local num_fechas = 1
-        if regexm("`ini_test'", "^[0-9]") {
-            local num_fechas = 2
+    if `n_words' >= 1 {
+        local fin_test : word `n_words' of `args'
+        if regexm("`fin_test'", "^[0-9]") {
+            local num_fechas = 1
+            if `n_words' >= 2 {
+                local ini_test : word `= `n_words' - 1' of `args'
+                if regexm("`ini_test'", "^[0-9]") {
+                    local num_fechas = 2
+                }
+            }
         }
     }
     
@@ -30,12 +33,17 @@ program define dbcrp
         local p_ini = `n_words'
         local p_series = `n_words' - 1
         local ini : word `p_ini' of `args'
-        local fin "2099" // Asume la actualidad
+        local fin "2099"
     }
     else {
         local p_series = `n_words'
-        local ini "1900" // Asume toda la historia
+        local ini "1900"
         local fin "2099"
+    }
+    
+    if `p_series' <= 0 {
+        display as error "Error: Debes ingresar al menos el codigo de una serie."
+        exit 198
     }
     
     local listaseries ""
@@ -59,7 +67,7 @@ program define dbcrp
         capture copy "`url'" "temp_raw.txt", replace
         capture confirm file "temp_raw.txt"
         if _rc != 0 {
-            display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexión o el código."
+            display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexion o el codigo ingresado."
             exit 601
         }
         
@@ -70,7 +78,7 @@ program define dbcrp
         
         capture confirm variable v2
         if _rc != 0 {
-            display as error "ERROR: La serie `serie' no existe en el BCRP o está vacía."
+            display as error "ERROR: La serie `serie' no existe en el BCRP o esta vacia."
             capture erase "temp_raw.txt"
             capture erase "temp_clean.csv"
             exit 111
@@ -160,5 +168,5 @@ program define dbcrp
         capture erase "base_consolidada.dta"
     }
     display as result "Proceso terminado."
-	display as text "Para citar este comando: Huaynate Onofre, A. (2026). dbcrp: Stata module to download BCRP data."
+    display as text "Para citar este comando: Huaynate Onofre, A. (2026). dbcrp: Stata module to download BCRP data."
 end
