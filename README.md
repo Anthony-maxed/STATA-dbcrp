@@ -1,4 +1,4 @@
-# dbcrp: Web Scraping del BCRP para Stata
+# dbcrp: Data del BCRP para Stata
 
 `dbcrp` es un comando nativo para Stata que permite descargar, limpiar y estructurar series de tiempo macroeconómicas directamente desde el API del Banco Central de Reserva del Perú (BCRP).
 
