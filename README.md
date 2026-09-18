@@ -2,7 +2,7 @@
 
 `dbcrp` es un comando nativo para Stata que permite descargar, limpiar y estructurar series de tiempo macroeconómicas directamente desde el API del Banco Central de Reserva del Perú (BCRP).
 
-El comando maneja automáticamente las etiquetas HTML residuales del servidor gubernamental, detecta la frecuencia temporal (anual, trimestral, mensual), resuelve los requerimientos estrictos de formato de fecha del servidor y consolida múltiples series de tiempo en una base de datos sincronizada, lista para análisis macroeconómico y estimaciones econométricas, protegiendo las descripciones originales en las notas del sistema.
+El comando detecta automáticamente si la serie es anual, trimestral o mensual, se encarga de los formatos de fecha del BCRP y junta varias series en una sola base lista para usar en Stata, guardando los títulos originales en las notas del sistema.
 
 ## Instalación
 
