@@ -1,4 +1,4 @@
-*! version 5.7 dbcrp - Creado por Anthony Facundo Huaynate Onofre
+*! version 5.8 dbcrp - Creado por Anthony Facundo Huaynate Onofre
 capture program drop dbcrp
 program define dbcrp
     version 15
@@ -64,6 +64,8 @@ program define dbcrp
     tempfile temp_raw temp_clean temp_serie base_consolidada
     
     local contador = 1
+    local freq_base = 0
+    
     foreach serie in `listaseries' {
         
         * INTELIGENCIA DE URL: Autocompletar meses/trimestres
@@ -128,6 +130,18 @@ program define dbcrp
             gen byte freq = 1 
             replace freq = 4 if regexm(str_lower, "t[1-4]")
             replace freq = 12 if regexm(str_lower, "(ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic)")
+            
+            * SALVAGUARDA DE FRECUENCIA
+            if `contador' == 1 {
+                local freq_base = freq[1]
+            }
+            else {
+                if freq[1] != `freq_base' {
+                    display as error "ERROR: Estas intentando mezclar series de distinta frecuencia en una misma ejecucion."
+                    display as error "Verifica que todas las series solicitadas sean de la misma frecuencia (anual, trimestral o mensual)."
+                    exit 198
+                }
+            }
             
             if freq[1] == 1 {
                 gen fecha = real(periodo)
