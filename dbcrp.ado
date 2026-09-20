@@ -1,4 +1,4 @@
-*! version 5.8 dbcrp - Creado por Anthony Facundo Huaynate Onofre
+*! version 8.0 dbcrp - Creado por Anthony Facundo Huaynate Onofre
 capture program drop dbcrp
 program define dbcrp
     version 15
@@ -21,7 +21,7 @@ program define dbcrp
         }
     }
     
-    * Asignar inicio, fin y cantidad de series
+    * Asignar inicio y fin (Ajuste a documentacion oficial del BCRP)
     if `num_fechas' == 2 {
         local p_fin = `n_words'
         local p_ini = `n_words' - 1
@@ -33,12 +33,12 @@ program define dbcrp
         local p_ini = `n_words'
         local p_series = `n_words' - 1
         local ini : word `p_ini' of `args'
-        local fin "2099"
+        local fin ""
     }
     else {
         local p_series = `n_words'
-        local ini "1900"
-        local fin "2099"
+        local ini ""
+        local fin ""
     }
     
     if `p_series' <= 0 {
@@ -60,69 +60,113 @@ program define dbcrp
         }
     }
     
-    * ARCHIVOS FANTASMA: Evitan errores de directorio y permisos
     tempfile temp_raw temp_clean temp_serie base_consolidada
-    
     local contador = 1
     local freq_base = 0
     
     foreach serie in `listaseries' {
         
-        * INTELIGENCIA DE URL: Autocompletar meses/trimestres
-        local url_ini "`ini'"
-        local url_fin "`fin'"
+        * INTELIGENCIA DE URL
         local len = length("`serie'")
         local char_freq = upper(substr("`serie'", `len', 1))
         
-        if regexm("`url_ini'", "^[0-9][0-9][0-9][0-9]$") {
-            if "`char_freq'" == "M" | "`char_freq'" == "Q" {
-                local url_ini "`url_ini'-1"
+        if "`ini'" != "" & "`fin'" != "" {
+            local url_ini "`ini'"
+            local url_fin "`fin'"
+            if regexm("`url_ini'", "^[0-9][0-9][0-9][0-9]$") {
+                if "`char_freq'" == "M" | "`char_freq'" == "Q" {
+                    local url_ini "`url_ini'-1"
+                }
             }
+            if regexm("`url_fin'", "^[0-9][0-9][0-9][0-9]$") {
+                if "`char_freq'" == "M" {
+                    local url_fin "`url_fin'-12"
+                }
+                else if "`char_freq'" == "Q" {
+                    local url_fin "`url_fin'-4"
+                }
+            }
+            local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`url_ini'/`url_fin'"
         }
-        if regexm("`url_fin'", "^[0-9][0-9][0-9][0-9]$") {
-            if "`char_freq'" == "M" {
-                local url_fin "`url_fin'-12"
+        else if "`ini'" != "" & "`fin'" == "" {
+            local url_ini "`ini'"
+            if regexm("`url_ini'", "^[0-9][0-9][0-9][0-9]$") {
+                if "`char_freq'" == "M" | "`char_freq'" == "Q" {
+                    local url_ini "`url_ini'-1"
+                }
             }
-            else if "`char_freq'" == "Q" {
-                local url_fin "`url_fin'-4"
+            local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`url_ini'"
+        }
+        else {
+            local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv"
+        }
+        
+        * =========================================================
+        * MOTOR UNIVERSAL ANTIBLOQUEO (cURL / PowerShell / copy)
+        * =========================================================
+        capture erase "`temp_raw'"
+        local descargado = 0
+        local os_temp = subinstr("`temp_raw'", "\", "/", .) 
+        
+        * 1. Motor Primario: cURL (Nativo en Mac, Linux y Win10+)
+        if `descargado' == 0 {
+            capture quietly shell curl -s -k -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "`url'" -o "`os_temp'"
+            capture confirm file "`temp_raw'"
+            if _rc == 0 {
+                local descargado = 1
             }
         }
         
-        local url "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/`serie'/csv/`url_ini'/`url_fin'"
+        * 2. Motor Secundario: PowerShell (Para Windows si cURL falla)
+        if `descargado' == 0 & "`c(os)'" == "Windows" {
+            capture quietly shell powershell -Command "$client = new-object System.Net.WebClient; $client.Headers.Add('User-Agent','Mozilla/5.0 (Windows NT 10.0; Win64; x64)'); $client.DownloadFile('`url'', '`os_temp'');"
+            capture confirm file "`temp_raw'"
+            if _rc == 0 {
+                local descargado = 1
+            }
+        }
         
-        capture copy "`url'" "`temp_raw'", replace
-        capture confirm file "`temp_raw'"
-        if _rc != 0 {
-            display as error "ERROR: No se pudo descargar la serie `serie'. Verifica tu conexion o el codigo."
+        * 3. Motor Terciario: Stata Copy (Fallback final)
+        if `descargado' == 0 {
+            capture copy "`url'" "`temp_raw'", replace
+            capture confirm file "`temp_raw'"
+            if _rc == 0 {
+                local descargado = 1
+            }
+        }
+        
+        * Control final de conexión
+        if `descargado' == 0 {
+            display as error "ERROR BCRP: El Firewall del banco rechazo la peticion de la serie `serie'."
+            display as text "-> URL bloqueada: `url'"
             exit 601
         }
+        * =========================================================
         
         capture erase "`temp_clean'"
         filefilter "`temp_raw'" "`temp_clean'", from("<br>") to("\n") replace
         
-        import delimited "`temp_clean'", clear varnames(nonames)
+        capture import delimited "`temp_clean'", clear varnames(nonames)
         
+        * Validacion de archivo corrupto por bloqueo
         capture confirm variable v2
         if _rc != 0 {
-            display as error "ERROR: La serie `serie' no existe en el BCRP o esta vacia."
+            display as error "ERROR BCRP: El banco bloqueo la descarga (Error 403) o la serie `serie' no existe."
             exit 111
         }
         
         quietly {
             local titulo_full = v2[1]
-            
             if "`names'" != "" {
                 local var_nom : word `contador' of `names'
             }
             else {
                 local var_nom "`serie'"
             }
-            
             rename v1 periodo
             rename v2 `var_nom'
             
             note `var_nom': Nombre original BCRP: `titulo_full'
-            
             drop in 1 
             destring `var_nom', replace force
             
@@ -131,14 +175,12 @@ program define dbcrp
             replace freq = 4 if regexm(str_lower, "t[1-4]")
             replace freq = 12 if regexm(str_lower, "(ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic)")
             
-            * SALVAGUARDA DE FRECUENCIA
             if `contador' == 1 {
                 local freq_base = freq[1]
             }
             else {
                 if freq[1] != `freq_base' {
-                    display as error "ERROR: Estas intentando mezclar series de distinta frecuencia en una misma ejecucion."
-                    display as error "Verifica que todas las series solicitadas sean de la misma frecuencia (anual, trimestral o mensual)."
+                    display as error "ERROR: Estas intentando mezclar series de distinta frecuencia."
                     exit 198
                 }
             }
